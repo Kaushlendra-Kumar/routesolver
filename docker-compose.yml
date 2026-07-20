@@ -1,0 +1,36 @@
+# Run the whole app with one command:
+#
+#   docker compose up --build
+#   → open http://localhost:8080
+#
+# Straight-line distance and address geocoding work immediately. Road
+# distances need OSRM — see the commented service below and
+# scripts/setup-osrm.sh.
+
+services:
+  routeserver:
+    build: .
+    ports:
+      - "8080:8080"
+    # To enable road metrics, uncomment the osrm service below, run
+    # scripts/setup-osrm.sh once, then change this to:
+    #   command: ["-addr", ":8080", "-osrm", "http://osrm:5000"]
+    command: ["-addr", ":8080"]
+    restart: unless-stopped
+    # depends_on:
+    #   - osrm
+
+  # --- Optional: OSRM routing engine for road distances/durations ---
+  # One-time prep first (downloads + preprocesses a regional map extract):
+  #   ./scripts/setup-osrm.sh
+  # That populates ./osrm-data. Then uncomment this service and the
+  # depends_on / command lines above, and re-run `docker compose up`.
+  #
+  # osrm:
+  #   image: osrm/osrm-backend
+  #   ports:
+  #     - "5000:5000"
+  #   volumes:
+  #     - ./osrm-data:/data
+  #   command: osrm-routed --algorithm mld /data/region.osrm
+  #   restart: unless-stopped

@@ -1,0 +1,13 @@
+# Binaries
+/routeserver
+/routecli
+*.exe
+*.out
+
+# OSRM preprocessed map data (large, regenerate with scripts/setup-osrm.sh)
+/osrm-data/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

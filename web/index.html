@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Route Optimiser</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <style>
+      :root {
+        --accent: #2563eb;
+        --accent-dark: #1d4ed8;
+        --depot: #059669;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --muted: #64748b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+      #sidebar {
+        width: 380px;
+        min-width: 380px;
+        background: var(--card);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+      }
+      #sidebar .pad {
+        padding: 20px;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 18px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin: 14px 0 6px;
+      }
+      textarea {
+        width: 100%;
+        height: 150px;
+        resize: vertical;
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 13px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        line-height: 1.5;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      select {
+        width: 100%;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        background: #fff;
+      }
+      button {
+        width: 100%;
+        margin-top: 18px;
+        padding: 11px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        background: var(--accent-dark);
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      #status {
+        font-size: 13px;
+        margin-top: 14px;
+        min-height: 18px;
+      }
+      #status.err {
+        color: #dc2626;
+      }
+      #status.ok {
+        color: var(--depot);
+      }
+      .summary {
+        margin-top: 16px;
+        padding: 14px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        display: none;
+      }
+      .summary.show {
+        display: block;
+      }
+      .metric-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        margin: 3px 0;
+      }
+      .metric-row .big {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .saved {
+        color: var(--depot);
+        font-weight: 600;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        background: #eff6ff;
+        color: var(--accent-dark);
+        margin-top: 6px;
+      }
+      ol.stops {
+        margin: 12px 0 0;
+        padding-left: 0;
+        list-style: none;
+      }
+      ol.stops li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      ol.stops li:last-child {
+        border-bottom: none;
+      }
+      .num {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .num.depot {
+        background: var(--depot);
+      }
+      .leg-cost {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .notfound {
+        color: #dc2626;
+        font-size: 12px;
+        margin-top: 8px;
+      }
+      #map {
+        flex: 1;
+        height: 100%;
+      }
+      .pin {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        color: #fff;
+        font-weight: 700;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar">
+      <div class="pad">
+        <h1>Route Optimiser</h1>
+        <p class="sub">
+          Shortest round trip through every stop, starting and ending at your
+          depot.
+        </p>
+
+        <label for="addresses">Addresses</label>
+        <textarea id="addresses" spellcheck="false"></textarea>
+        <div class="hint">
+          One per line. The first line is your depot (start & end).
+        </div>
+
+        <label for="metric">Optimise for</label>
+        <select id="metric">
+          <option value="haversine">Straight-line distance (no setup)</option>
+          <option value="road_distance">Road distance (needs OSRM)</option>
+          <option value="road_duration">Travel time (needs OSRM)</option>
+        </select>
+
+        <button id="go">Optimise route</button>
+        <div id="status"></div>
+
+        <div class="summary" id="summary">
+          <div class="metric-row">
+            <span>Optimised</span><span class="big" id="total"></span>
+          </div>
+          <div class="metric-row">
+            <span>Input order</span><span id="baseline"></span>
+          </div>
+          <div class="metric-row">
+            <span>Saved</span><span class="saved" id="saved"></span>
+          </div>
+          <span class="badge" id="method"></span>
+          <div class="notfound" id="notfound"></div>
+          <ol class="stops" id="stops"></ol>
+        </div>
+      </div>
+    </div>
+    <div id="map"></div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script>
+      const DEMO = [
+        'Kempegowda Bus Station, Bengaluru',
+        'Lalbagh Botanical Garden, Bengaluru',
+        'Cubbon Park, Bengaluru',
+        'ISKCON Temple, Bengaluru',
+        'Bangalore Palace, Bengaluru',
+        'UB City, Bengaluru',
+        'Bannerghatta National Park, Bengaluru',
+      ]
+      document.getElementById('addresses').value = DEMO.join('\n')
+
+      const map = L.map('map').setView([12.9716, 77.5946], 12)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map)
+
+      let markers = []
+      let routeLine = null
+
+      function clearMap() {
+        markers.forEach((m) => map.removeLayer(m))
+        markers = []
+        if (routeLine) {
+          map.removeLayer(routeLine)
+          routeLine = null
+        }
+      }
+
+      function pinIcon(label, isDepot) {
+        const bg = isDepot ? '#059669' : '#2563eb'
+        return L.divIcon({
+          className: '',
+          html: `<div class="pin" style="background:${bg}">${label}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        })
+      }
+
+      function setStatus(msg, cls) {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className = cls || ''
+      }
+
+      async function postJSON(path, body) {
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok)
+          throw new Error(data.error || res.status + ' ' + res.statusText)
+        return data
+      }
+
+      async function optimise() {
+        const btn = document.getElementById('go')
+        const addresses = document
+          .getElementById('addresses')
+          .value.split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean)
+
+        document.getElementById('summary').classList.remove('show')
+        clearMap()
+
+        if (addresses.length < 2) {
+          setStatus(
+            'Enter at least two addresses (a depot and one stop).',
+            'err',
+          )
+          return
+        }
+
+        btn.disabled = true
+        try {
+          // 1) Geocode addresses → coordinates (rate-limited server-side).
+          setStatus(
+            `Geocoding ${addresses.length} addresses… (about 1 per second)`,
+          )
+          const geo = await postJSON('/geocode', { addresses })
+          const found = geo.results.filter((r) => r.found)
+          const missing = geo.results
+            .filter((r) => !r.found)
+            .map((r) => r.address)
+
+          if (found.length < 2) {
+            setStatus(
+              "Couldn't geocode enough addresses to build a route.",
+              'err',
+            )
+            if (missing.length)
+              document.getElementById('notfound').textContent =
+                'Not found: ' + missing.join('; ')
+            return
+          }
+
+          // Drop pins in input order so the user sees them land.
+          const stops = found.map((r) => ({
+            name: r.address,
+            lat: r.lat,
+            lng: r.lng,
+          }))
+          stops.forEach((s, i) =>
+            markers.push(
+              L.marker([s.lat, s.lng], { icon: pinIcon(i + 1, i === 0) })
+                .addTo(map)
+                .bindPopup(s.name),
+            ),
+          )
+          map.fitBounds(
+            L.latLngBounds(stops.map((s) => [s.lat, s.lng])).pad(0.15),
+          )
+
+          // 2) Optimise the order. Road metrics need OSRM; if it's unavailable,
+          //    fall back to straight-line instead of showing a hard error.
+          setStatus('Optimising route…')
+          const metric = document.getElementById('metric').value
+          let opt,
+            note = ''
+          try {
+            opt = await postJSON('/optimize', { stops, metric, mode: 'auto' })
+          } catch (e) {
+            if (metric === 'haversine') throw e // straight-line has no fallback
+            opt = await postJSON('/optimize', {
+              stops,
+              metric: 'haversine',
+              mode: 'auto',
+            })
+            note =
+              'Road distances need an OSRM server — showing straight-line instead.'
+          }
+
+          drawResult(stops, opt)
+          setStatus(note || 'Done.', note ? '' : 'ok')
+          if (missing.length)
+            document.getElementById('notfound').textContent =
+              'Skipped (not found): ' + missing.join('; ')
+        } catch (err) {
+          setStatus(err.message, 'err')
+        } finally {
+          btn.disabled = false
+        }
+      }
+
+      function drawResult(stops, opt) {
+        clearMap()
+
+        // Coordinates in optimised visit order (tour_indices is closed: depot..depot).
+        const path = opt.tour_indices.map((i) => [stops[i].lat, stops[i].lng])
+        routeLine = L.polyline(path, {
+          color: '#2563eb',
+          weight: 4,
+          opacity: 0.8,
+        }).addTo(map)
+
+        // Numbered markers following visit order (last index repeats the depot).
+        opt.tour_indices.slice(0, -1).forEach((stopIdx, visitPos) => {
+          const s = stops[stopIdx]
+          markers.push(
+            L.marker([s.lat, s.lng], {
+              icon: pinIcon(visitPos + 1, visitPos === 0),
+            })
+              .addTo(map)
+              .bindPopup(`${visitPos + 1}. ${s.name}`),
+          )
+        })
+        map.fitBounds(routeLine.getBounds().pad(0.15))
+
+        // Summary panel.
+        const unit = opt.unit
+        document.getElementById('total').textContent =
+          `${opt.total_cost} ${unit}`
+        document.getElementById('baseline').textContent =
+          `${opt.baseline_cost} ${unit}`
+        document.getElementById('saved').textContent =
+          `${opt.saved_percent}% shorter`
+        document.getElementById('method').textContent =
+          opt.method === 'held-karp'
+            ? 'provably optimal (Held–Karp)'
+            : 'heuristic (multi-start 2-opt)'
+
+        const ol = document.getElementById('stops')
+        ol.innerHTML = ''
+        opt.order.forEach((name, i) => {
+          const isDepotReturn = i === opt.order.length - 1
+          const li = document.createElement('li')
+          const num = document.createElement('span')
+          num.className = 'num' + (i === 0 || isDepotReturn ? ' depot' : '')
+          num.textContent = isDepotReturn ? '⤺' : i + 1
+          const label = document.createElement('span')
+          label.textContent = isDepotReturn ? 'return to depot' : name
+          li.appendChild(num)
+          li.appendChild(label)
+          if (i > 0 && opt.legs[i - 1]) {
+            const cost = document.createElement('span')
+            cost.className = 'leg-cost'
+            cost.textContent = `+${opt.legs[i - 1].cost} ${unit}`
+            li.appendChild(cost)
+          }
+          ol.appendChild(li)
+        })
+        document.getElementById('summary').classList.add('show')
+      }
+
+      document.getElementById('go').addEventListener('click', optimise)
+    </script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+.git
+.github
+*.md
+osrm-data
+/routeserver
+/tmp
+Dockerfile
+docker-compose.yml
+.dockerignore
+.gitignore
