@@ -18,9 +18,7 @@ type geocodeResponse struct {
 	Results []geocode.Result `json:"results"`
 }
 
-// handleGeocode resolves a batch of addresses to coordinates, preserving
-// input order and returning a Found flag per address. Rate limiting and
-// caching live in the geocode client.
+
 func (s *Server) handleGeocode(w http.ResponseWriter, r *http.Request) {
 	if s.geocoder == nil {
 		writeError(w, http.StatusServiceUnavailable, errNoGeocoder.Error())
